@@ -67,7 +67,7 @@ haven't specified one), runs C<execute_scenario>.
 =cut
 
 sub execute {
-    my ( $self, $feature, $harness, $tag_spec ) = @_;
+    my ( $self, $feature, $harness, $tag_spec, $app ) = @_;
     my $feature_stash = {};
 
     $harness->feature( $feature );
@@ -90,7 +90,8 @@ sub execute {
             scenario      => $scenario,
             feature       => $feature,
             feature_stash => $feature_stash,
-            harness       => $harness
+            harness       => $harness,
+            app           => $app
         });
     }
 
@@ -126,10 +127,10 @@ sub execute_scenario {
     my ( $self, $options ) = @_;
     my (
         $feature, $feature_stash, $harness, $outline, $background_obj,
-        $incoming_scenario_stash, $incoming_outline_stash
+        $incoming_scenario_stash, $incoming_outline_stash, $app
     ) = @$options{
         qw/ feature feature_stash harness scenario background scenario_stash
-        outline_stash
+        outline_stash app
         /
     };
 
@@ -161,7 +162,8 @@ sub execute_scenario {
                 feature_stash  => $feature_stash,
                 harness        => $harness,
                 scenario_stash => $scenario_stash,
-                outline_stash  => $outline_stash
+                outline_stash  => $outline_stash,
+                app            => $app
             });
         }
 
@@ -194,7 +196,8 @@ sub execute_scenario {
             });
 
             my $result = $self->dispatch( $context,
-                    $outline_stash->{'short_circuit'} );
+                    $outline_stash->{'short_circuit'},
+                    $app );
 
             # If it didn't pass, short-circuit the rest
             unless ( $result->result eq 'passing' ) {
@@ -238,7 +241,7 @@ steps should be skipped.
 =cut
 
 sub dispatch {
-    my ( $self, $context, $short_circuit ) = @_;
+    my ( $self, $context, $short_circuit, $app ) = @_;
 
     # Short-circuit if we need to
     return $self->skip_step($context, 'pending', "Short-circuited from previous tests")
@@ -286,7 +289,11 @@ sub dispatch {
             $context->matches([ $context->text =~ $regular_expression ]);
 
             # Execute!
-            eval { $coderef->( $context ) };
+            if ($app->extra_fields) {
+                eval { $coderef->( $context, $context->stash->{'scenario'} ) };
+            } else {
+                eval { $coderef->( $context ) };
+            }
             if ( $@ ) {
                 $Test::Builder::Test->ok( 0, "Test compiled" );
                 $Test::Builder::Test->diag( $@ );

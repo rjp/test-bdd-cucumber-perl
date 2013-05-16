@@ -5,6 +5,9 @@ use warnings;
 use FindBin::libs;
 use Getopt::Long;
 
+use Moose;
+has 'extra_fields' => ( is => 'rw', isa => 'Bool', required => 0 );
+
 =head1 NAME
 
 App::pherkin - Run Cucumber tests from the command line
@@ -42,9 +45,9 @@ Returns a L<Test::BDD::Cucumber::Model::Result> object for all steps run.
 =cut
 
 sub run {
-    my ( $class, @arguments ) = @_;
+    my ( $self, @arguments ) = @_;
 
-    @arguments = $class->_process_arguments(@arguments);
+    @arguments = $self->_process_arguments(@arguments);
 
     my ( $executor, @features ) = Test::BDD::Cucumber::Loader->load(
         $arguments[0] || './features/'
@@ -52,13 +55,13 @@ sub run {
     die "No feature files found" unless @features;
 
     my $harness  = Test::BDD::Cucumber::Harness::TermColor->new();
-    $executor->execute( $_, $harness ) for @features;
+    $executor->execute( $_, $harness, undef, $self ) for @features;
 
     return $harness->result;
 }
 
 sub _process_arguments {
-    my ( $class, @args ) = @_;
+    my ( $self, @args ) = @_;
     local @ARGV = @args;
 
     # Allow -Ilib, -bl
@@ -69,11 +72,14 @@ sub _process_arguments {
         'I=s@'   => \$includes,
         'l|lib'  => \(my $add_lib),
         'b|blib' => \(my $add_blib),
+        'e|extra' => \(my $extras),
     );
     unshift @$includes, 'lib'                   if $add_lib;
     unshift @$includes, 'blib/lib', 'blib/arch' if $add_blib;
 
     lib->import(@$includes) if @$includes;
+
+    $self->extra_fields($extras);
 
     return @ARGV;
 }
